@@ -8,37 +8,24 @@
 #![no_main]
 #![no_std]
 
-use cortex_m::{
-    self,
-    delay::Delay,
-    interrupt::{free, Mutex},
-    peripheral::NVIC,
-};
+use cortex_m::{self, delay::Delay};
 use cortex_m_rt::entry;
 
 // These lines are part of our setup for debug printing.
 use defmt_rtt as _;
+use doppler_radar::LiquidCrystal;
 use panic_probe as _;
-
-use defmt::prinln;
 
 // Import parts of this library we use. You could use this style, or perhaps import
 // less here.
-use stm32_hal2::{
-    self,
-    clocks::Clocks,
-    dma::{Dma, DmaChannel, DmaInterrupt},
-    gpio::{Edge, OutputType, Pin, PinMode, Port, Pull},
-    low_power, pac,
-    timer::{Timer, TimerInterrupt},
-};
+use stm32_hal2::{self, clocks::Clocks, gpio::{Pin, Port, PinMode}, pac};
 
 #[entry]
 fn main() -> ! {
     // Set up ARM Cortex-M peripherals. These are common to many MCUs, including all STM32 ones.
-    let mut cp = cortex_m::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
     // Set up peripherals specific to the microcontroller you're using.
-    let mut dp = pac::Peripherals::take().unwrap();
+    let mut _dp = pac::Peripherals::take().unwrap();
 
     // This line is required to prevent the debugger from disconnecting on entering WFI.
     // This appears to be a limitation of many STM32 families. Not required in production code,
@@ -54,12 +41,27 @@ fn main() -> ! {
     // and the `clock_cfg` example.
     clock_cfg.setup().unwrap();
 
+    // Delay
+    let mut delay = Delay::new(cp.SYST, clock_cfg.systick());
+
+    // LCD
+    let mut lcd = LiquidCrystal::new(
+        Pin::new(Port::A, 8, PinMode::Output),
+        Pin::new(Port::B, 10, PinMode::Output),
+        Pin::new(Port::B, 4, PinMode::Output),
+        Pin::new(Port::B, 5, PinMode::Output),
+        Pin::new(Port::A, 9, PinMode::Output),
+        Pin::new(Port::C, 7, PinMode::Output),
+    );
+    lcd.init(&mut delay);
+    lcd.send_string("Hello World", &mut delay);
+
     loop {
         defmt::println!("Looping!"); // A print statement using DEFMT.
                                      // Enter a low power mode. The program will wake once an interrupt fires.
                                      // For example, the timer and GPIO interrupt above. But we haven't unmasked
                                      // their lines, so they won't work - see the `interrupts` example for that.
-        low_power::sleep_now();
+        delay.delay_ms(1000);
     }
 }
 
