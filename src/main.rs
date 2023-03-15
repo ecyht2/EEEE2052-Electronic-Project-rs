@@ -13,19 +13,26 @@ use cortex_m_rt::entry;
 
 // These lines are part of our setup for debug printing.
 use defmt_rtt as _;
-use doppler_radar::LiquidCrystal;
+use doppler_radar::{lcd::shield_button_init, LiquidCrystal};
 use panic_probe as _;
 
 // Import parts of this library we use. You could use this style, or perhaps import
 // less here.
-use stm32_hal2::{self, clocks::Clocks, gpio::{Pin, Port, PinMode}, pac};
+use stm32_hal2::{
+    self,
+    adc::{Adc, AdcConfig, AdcDevice},
+    clocks::Clocks,
+    comp::{self, Comp, CompConfig, CompDevice},
+    gpio::{Pin, PinMode, Port},
+    pac,
+};
 
 #[entry]
 fn main() -> ! {
     // Set up ARM Cortex-M peripherals. These are common to many MCUs, including all STM32 ones.
     let cp = cortex_m::Peripherals::take().unwrap();
     // Set up peripherals specific to the microcontroller you're using.
-    let mut _dp = pac::Peripherals::take().unwrap();
+    let dp = pac::Peripherals::take().unwrap();
 
     // This line is required to prevent the debugger from disconnecting on entering WFI.
     // This appears to be a limitation of many STM32 families. Not required in production code,
@@ -56,11 +63,30 @@ fn main() -> ! {
     lcd.init(&mut delay);
     lcd.send_string("Hello World", &mut delay);
 
+    // LCD Buttons
+    shield_button_init(dp.ADC2, &clock_cfg);
+
+    // Comparator
+    let mut _comp_pin = Pin::new(Port::B, 2, PinMode::Analog);
+    let mut _comp_pin = Pin::new(Port::C, 5, PinMode::Analog);
+    let cfg = CompConfig {
+        blanking: comp::BlankingSource::None,
+        hyst: comp::Hysterisis::NoHysterisis,
+        inmsel: comp::InvertingInput::Vref,
+        inpsel: comp::NonInvertingInput::Io2,
+        polarity: comp::OutputPolarity::NotInverted,
+        pwrmode: comp::PowerMode::HighSpeed,
+    };
+    let mut comp = Comp::new(CompDevice::One, cfg);
+    comp.start();
+
     loop {
-        defmt::println!("Looping!"); // A print statement using DEFMT.
-                                     // Enter a low power mode. The program will wake once an interrupt fires.
-                                     // For example, the timer and GPIO interrupt above. But we haven't unmasked
-                                     // their lines, so they won't work - see the `interrupts` example for that.
+        // button_adc.start_conversion(&[5]);
+        // let reading = button_adc.read_result();
+
+        // let reading = comp.get_output_level();
+        let reading = dp.COMP.comp1_csr.read().bits();
+        defmt::println!("{}", reading);
         delay.delay_ms(1000);
     }
 }

@@ -1,5 +1,10 @@
 use cortex_m::delay::Delay;
-use stm32_hal2::gpio::{Pin, PinState};
+use stm32_hal2::{
+    adc::{Adc, AdcConfig, AdcDevice},
+    clocks::Clocks,
+    gpio::{Pin, PinMode, PinState, Port},
+    pac::ADC2,
+};
 
 pub struct LiquidCrystal {
     d7: Pin,
@@ -99,4 +104,22 @@ impl LiquidCrystal {
 
         self.send_cmd(col, delay);
     }
+}
+
+pub fn shield_button_init(adc: ADC2, clock_cfg: &Clocks) {
+    let mut _adc_pin = Pin::new(Port::A, 0, PinMode::Analog);
+    let adc_config = AdcConfig {
+        prescaler: stm32_hal2::adc::Prescaler::D128,
+        operation_mode: stm32_hal2::adc::OperationMode::OneShot,
+        cal_single_ended: None,
+        cal_differential: None,
+        ..Default::default()
+    };
+
+    let mut button_adc = Adc::new_adc2(adc, AdcDevice::Two, adc_config, &clock_cfg);
+    button_adc.set_input_type(5, stm32_hal2::adc::InputType::SingleEnded);
+    button_adc.set_align(stm32_hal2::adc::Align::Right);
+    button_adc.set_sample_time(5, stm32_hal2::adc::SampleTime::T2);
+    button_adc.set_sequence(5, 1);
+    button_adc.set_sequence_len(1);
 }
